@@ -1,0 +1,149 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="utf-8">
+    <title>Discord Rich Presence</title>
+</head>
+<body>
+    <div id="discordPresenceConfigPage" data-role="page" class="page type-interior pluginConfigurationPage" data-require="emby-input,emby-button,emby-select,emby-checkbox">
+        <div data-role="content">
+            <div class="content-primary">
+                <form id="discordPresenceConfigForm">
+                    <div class="verticalSection">
+                        <h2 class="sectionTitle">Discord Rich Presence</h2>
+                        <p>
+                            Users run the companion app on the computer where Discord is open, and it shows what they
+                            play on this server in their Discord status. Nothing is shared for users who don't run it.
+                        </p>
+                    </div>
+
+                    <div class="checkboxContainer checkboxContainer-withDescription">
+                        <label class="emby-checkbox-label">
+                            <input id="Enabled" type="checkbox" is="emby-checkbox" />
+                            <span>Enable Discord presence</span>
+                        </label>
+                        <div class="fieldDescription checkboxFieldDescription">Turn off to stop publishing presence for everyone.</div>
+                    </div>
+
+                    <div class="inputContainer">
+                        <label class="inputLabel inputLabelUnfocused" for="DiscordApplicationId">Discord application ID</label>
+                        <input id="DiscordApplicationId" type="text" is="emby-input" inputmode="numeric" pattern="[0-9]*" />
+                        <div class="fieldDescription">
+                            Create an application at
+                            <a is="emby-linkbutton" class="button-link" href="https://discord.com/developers/applications" target="_blank" rel="noopener">discord.com/developers/applications</a>
+                            and paste its Application ID. Its name appears as "Watching <em>name</em>", so call it something like "Jellyfin".
+                        </div>
+                    </div>
+
+                    <div class="selectContainer">
+                        <label class="selectLabel" for="ArtworkSource">Artwork</label>
+                        <select is="emby-select" id="ArtworkSource" class="emby-select-withcolor emby-select">
+                            <option value="MetadataProviders">From metadata providers (TMDB, MusicBrainz, ...)</option>
+                            <option value="PublicServerUrl">From this server (needs a public URL)</option>
+                            <option value="None">None</option>
+                        </select>
+                        <div class="fieldDescription">
+                            Discord downloads the poster itself, so the image must be on the public internet.
+                            Metadata providers work even if this server isn't reachable from outside.
+                        </div>
+                    </div>
+
+                    <div class="inputContainer" id="PublicServerUrlContainer">
+                        <label class="inputLabel inputLabelUnfocused" for="PublicServerUrl">Public server URL</label>
+                        <input id="PublicServerUrl" type="url" is="emby-input" placeholder="https://jellyfin.example.com" />
+                        <div class="fieldDescription">Image links include this URL and the item's ID, and anyone viewing a user's profile can see them.</div>
+                    </div>
+
+                    <div class="checkboxContainer checkboxContainer-withDescription">
+                        <label class="emby-checkbox-label">
+                            <input id="IncludeExternalLinks" type="checkbox" is="emby-checkbox" />
+                            <span>Show IMDb / TMDB / MusicBrainz buttons</span>
+                        </label>
+                        <div class="fieldDescription checkboxFieldDescription">Discord shows up to two buttons. Other people see them; you don't see them on your own profile.</div>
+                    </div>
+
+                    <div class="verticalSection">
+                        <h3 class="sectionTitle">Never share these libraries</h3>
+                        <div id="ExcludedLibraries" class="checkboxList paperList" style="padding: .5em 1em;"></div>
+                    </div>
+
+                    <div>
+                        <button is="emby-button" type="submit" class="raised button-submit block emby-button">
+                            <span>Save</span>
+                        </button>
+                    </div>
+                </form>
+            </div>
+        </div>
+
+        <script type="text/javascript">
+            (function () {
+                var pluginId = 'bef32adf-0271-405b-97eb-aa01d658ef21';
+                var page = document.querySelector('#discordPresenceConfigPage');
+
+                function updateUrlVisibility() {
+                    var usesServer = page.querySelector('#ArtworkSource').value === 'PublicServerUrl';
+                    page.querySelector('#PublicServerUrlContainer').classList.toggle('hide', !usesServer);
+                }
+
+                function renderLibraries(folders, excluded) {
+                    var container = page.querySelector('#ExcludedLibraries');
+                    container.innerHTML = '';
+                    folders.forEach(function (folder) {
+                        var id = folder.ItemId.replace(/-/g, '');
+                        var label = document.createElement('label');
+                        label.className = 'emby-checkbox-label';
+                        label.style.display = 'block';
+                        var input = document.createElement('input');
+                        input.type = 'checkbox';
+                        input.setAttribute('is', 'emby-checkbox');
+                        input.className = 'chkExcludedLibrary';
+                        input.dataset.id = id;
+                        input.checked = excluded.indexOf(id) !== -1;
+                        var span = document.createElement('span');
+                        span.textContent = folder.Name;
+                        label.appendChild(input);
+                        label.appendChild(span);
+                        container.appendChild(label);
+                    });
+                }
+
+                page.addEventListener('pageshow', function () {
+                    Dashboard.showLoadingMsg();
+                    Promise.all([ApiClient.getPluginConfiguration(pluginId), ApiClient.getVirtualFolders()])
+                        .then(function (results) {
+                            var config = results[0];
+                            page.querySelector('#Enabled').checked = config.Enabled;
+                            page.querySelector('#DiscordApplicationId').value = config.DiscordApplicationId || '';
+                            page.querySelector('#ArtworkSource').value = config.ArtworkSource;
+                            page.querySelector('#PublicServerUrl').value = config.PublicServerUrl || '';
+                            page.querySelector('#IncludeExternalLinks').checked = config.IncludeExternalLinks;
+                            renderLibraries(results[1], (config.ExcludedLibraryIds || []).map(function (id) { return id.toLowerCase(); }));
+                            updateUrlVisibility();
+                        })
+                        .finally(function () { Dashboard.hideLoadingMsg(); });
+                });
+
+                page.querySelector('#ArtworkSource').addEventListener('change', updateUrlVisibility);
+
+                page.querySelector('#discordPresenceConfigForm').addEventListener('submit', function (e) {
+                    e.preventDefault();
+                    Dashboard.showLoadingMsg();
+                    ApiClient.getPluginConfiguration(pluginId).then(function (config) {
+                        config.Enabled = page.querySelector('#Enabled').checked;
+                        config.DiscordApplicationId = page.querySelector('#DiscordApplicationId').value.trim();
+                        config.ArtworkSource = page.querySelector('#ArtworkSource').value;
+                        config.PublicServerUrl = page.querySelector('#PublicServerUrl').value.trim();
+                        config.IncludeExternalLinks = page.querySelector('#IncludeExternalLinks').checked;
+                        config.ExcludedLibraryIds = Array.prototype.map.call(
+                            page.querySelectorAll('.chkExcludedLibrary:checked'),
+                            function (el) { return el.dataset.id; });
+                        ApiClient.updatePluginConfiguration(pluginId, config).then(Dashboard.processPluginConfigurationUpdateResult);
+                    });
+                    return false;
+                });
+            })();
+        </script>
+    </div>
+</body>
+</html>
