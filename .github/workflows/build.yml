@@ -1,0 +1,51 @@
+name: Build
+
+on:
+  push:
+    branches: [main]
+    paths-ignore: ["**.md", "manifest.json"]
+  pull_request:
+    paths-ignore: ["**.md", "manifest.json"]
+
+permissions:
+  contents: read
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+
+      - uses: actions/setup-dotnet@v6
+        with:
+          dotnet-version: 10.0.x
+
+      - name: Build
+        run: dotnet build -c Release -warnaserror
+
+      # Handy for trying a change on a server before releasing it
+      - uses: actions/upload-artifact@v7
+        with:
+          name: plugin-dll
+          path: src/Jellyfin.Plugin.DiscordPresence/bin/Release/*/Jellyfin.Plugin.DiscordPresence.dll
+          if-no-files-found: error
+
+  macos-app:
+    runs-on: macos-latest
+    steps:
+      - uses: actions/checkout@v7
+
+      - name: Test
+        run: swift test --package-path macos
+
+      - name: Bundle
+        run: macos/scripts/bundle.sh
+
+      - name: Disk image
+        run: macos/scripts/make-dmg.sh build/jf-dp.app build/jf-dp_macos.dmg
+
+      - uses: actions/upload-artifact@v7
+        with:
+          name: macos-dmg
+          path: macos/build/jf-dp_macos.dmg
+          if-no-files-found: error
