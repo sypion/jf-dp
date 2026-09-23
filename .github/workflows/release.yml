@@ -1,0 +1,133 @@
+name: Release
+
+# Push a tag like v1.2.0: builds everything into a draft GitHub release with generated notes.
+# Edit the notes there and publish it; publish.yml then ships it to Jellyfin servers and the macOS app.
+# A tag like macos-v1.2.0 releases only the macOS app and leaves the plugin on servers alone.
+on:
+  push:
+    tags: ["v*.*.*", "macos-v*.*.*"]
+
+permissions:
+  contents: read
+
+concurrency:
+  group: release
+  cancel-in-progress: false
+
+jobs:
+  version:
+    runs-on: ubuntu-latest
+    outputs:
+      semver: ${{ steps.parse.outputs.semver }}
+      plugin: ${{ steps.parse.outputs.plugin }}
+    steps:
+      - id: parse
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GH_REPO: ${{ github.repository }}
+          TAG: ${{ github.ref_name }}
+        run: |
+          if [[ ! "$TAG" =~ ^(macos-)?v([0-9]+\.[0-9]+\.[0-9]+)$ ]]; then
+            echo "::error::Tag '$TAG' must look like v1.2.3, or macos-v1.2.3 for the macOS app alone"
+            exit 1
+          fi
+          semver="${BASH_REMATCH[2]}"
+
+          if [ -n "${BASH_REMATCH[1]}" ]; then other="v$semver"; else other="macos-v$semver"; fi
+          if gh api "repos/$GH_REPO/git/ref/tags/$other" --silent 2>/dev/null; then
+            echo "::error::$other already exists; use the next version"
+            exit 1
+          fi
+          echo "semver=$semver" >> "$GITHUB_OUTPUT"
+          echo "plugin=$([ -z "${BASH_REMATCH[1]}" ] && echo true || echo false)" >> "$GITHUB_OUTPUT"
+
+  plugin:
+    needs: version
+    if: needs.version.outputs.plugin == 'true'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+
+      - uses: actions/setup-dotnet@v6
+        with:
+          dotnet-version: 10.0.x
+
+      # One zip per Jellyfin release line (see the project's TargetFrameworks), each with its own version.
+      - name: Build and package
+        env:
+          PROJECT: src/Jellyfin.Plugin.DiscordPresence
+          SEMVER: ${{ needs.version.outputs.semver }}
+        run: |
+          mkdir dist
+          for framework in $(dotnet msbuild "$PROJECT" -getProperty:TargetFrameworks | tr ';' ' '); do
+            version="$SEMVER.$(dotnet msbuild "$PROJECT" -p:TargetFramework="$framework" -getProperty:PluginRevision)"
+            dotnet publish "$PROJECT" -f "$framework" -c Release -o "out/$framework" -warnaserror \
+              -p:Version="$SEMVER" -p:AssemblyVersion="$version" -p:FileVersion="$version"
+            # Jellyfin unzips this into its plugins folder and writes meta.json itself from manifest.json.
+            zip -j "dist/jf-dp_$version.zip" "out/$framework/Jellyfin.Plugin.DiscordPresence.dll"
+          done
+
+      - uses: actions/upload-artifact@v7
+        with:
+          name: plugin
+          path: dist/
+          if-no-files-found: error
+
+  macos-app:
+    needs: version
+    runs-on: macos-latest
+    permissions:
+      # Writing release notes for the update window counts as a write.
+      contents: write
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          # Build numbers are the commit count.
+          fetch-depth: 0
+
+      - name: Build, sign and notarize
+        env:
+          VERSION: ${{ needs.version.outputs.semver }}
+          TAG: ${{ github.ref_name }}
+          CSC_LINK: ${{ secrets.CSC_LINK }}
+          CSC_KEY_PASSWORD: ${{ secrets.CSC_KEY_PASSWORD }}
+          APPLE_ID: ${{ secrets.APPLE_ID }}
+          APPLE_APP_SPECIFIC_PASSWORD: ${{ secrets.APPLE_APP_SPECIFIC_PASSWORD }}
+          APPLE_TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
+          SPARKLE_PRIVATE_KEY: ${{ secrets.SPARKLE_PRIVATE_KEY }}
+          GH_TOKEN: ${{ github.token }}
+        run: macos/scripts/ci.sh
+
+      - uses: actions/upload-artifact@v7
+        with:
+          name: macos-app
+          path: |
+            macos/release/jf-dp_macos.dmg
+            macos/release/jf-dp_macos.zip
+            macos/release/appcast.xml
+          if-no-files-found: error
+
+  draft:
+    needs: [plugin, macos-app]
+    if: ${{ !failure() && !cancelled() }}
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    env:
+      GH_TOKEN: ${{ github.token }}
+      GH_REPO: ${{ github.repository }}
+      TAG: ${{ github.ref_name }}
+    steps:
+      - uses: actions/download-artifact@v8
+        with:
+          path: dist
+          merge-multiple: true
+
+      # Nothing reaches servers or Macs until the draft is published, so a re-run can replace its files.
+      - name: Create draft release
+        run: |
+          if [ "$(gh release view "$TAG" --json isDraft --jq .isDraft 2>/dev/null)" = "true" ]; then
+            gh release upload "$TAG" dist/* --clobber
+          else
+            gh release create "$TAG" dist/* --draft --title "$TAG" --generate-notes --verify-tag
+          fi

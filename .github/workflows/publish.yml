@@ -1,0 +1,76 @@
+name: Publish
+
+# Runs when a draft from release.yml is published, and again whenever its notes are edited, so the
+# GitHub release notes are what Jellyfin's plugin catalog and the macOS app's update window show.
+on:
+  release:
+    types: [published, released, edited]
+
+permissions:
+  contents: write
+
+concurrency:
+  group: publish
+  cancel-in-progress: false
+
+jobs:
+  publish:
+    # Sparkle's feed skips pre-releases, so Jellyfin servers do too.
+    if: ${{ !github.event.release.draft && !github.event.release.prerelease }}
+    runs-on: ubuntu-latest
+    env:
+      GH_TOKEN: ${{ github.token }}
+      TAG: ${{ github.event.release.tag_name }}
+      NOTES: ${{ github.event.release.body }}
+    steps:
+      - id: parse
+        run: |
+          if [[ ! "$TAG" =~ ^(macos-)?v([0-9]+\.[0-9]+\.[0-9]+)$ ]]; then
+            echo "::error::Tag '$TAG' must look like v1.2.3, or macos-v1.2.3 for the macOS app alone"
+            exit 1
+          fi
+          echo "semver=${BASH_REMATCH[2]}" >> "$GITHUB_OUTPUT"
+          echo "plugin=$([ -z "${BASH_REMATCH[1]}" ] && echo true || echo false)" >> "$GITHUB_OUTPUT"
+
+      # The manifest lives on the default branch, which may be ahead of the tagged commit.
+      - uses: actions/checkout@v7
+        with:
+          ref: ${{ github.event.repository.default_branch }}
+
+      - name: Download release files
+        env:
+          PLUGIN: ${{ steps.parse.outputs.plugin }}
+        run: |
+          patterns=(--pattern appcast.xml)
+          if [ "$PLUGIN" = "true" ]; then
+            patterns+=(--pattern 'jf-dp_[0-9]*.zip')
+          fi
+          gh release download "$TAG" --dir "$RUNNER_TEMP/dist" "${patterns[@]}"
+          printf '%s\n' "$NOTES" > "$RUNNER_TEMP/notes.md"
+
+      - name: Update appcast.xml
+        run: |
+          python3 .github/scripts/update_appcast.py "$RUNNER_TEMP/dist/appcast.xml" --notes-file "$RUNNER_TEMP/notes.md"
+          gh release upload "$TAG" "$RUNNER_TEMP/dist/appcast.xml" --clobber
+
+      - name: Add to manifest.json
+        if: steps.parse.outputs.plugin == 'true'
+        run: >
+          python3 .github/scripts/update_manifest.py
+          --version "${{ steps.parse.outputs.semver }}"
+          --dist "$RUNNER_TEMP/dist"
+          --url-prefix "https://github.com/${{ github.repository }}/releases/download/$TAG/"
+          --changelog-file "$RUNNER_TEMP/notes.md"
+
+      - name: Commit manifest.json
+        if: steps.parse.outputs.plugin == 'true'
+        run: |
+          if git diff --quiet manifest.json; then
+            echo "manifest.json is already up to date"
+            exit 0
+          fi
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add manifest.json
+          git commit -m "Publish $TAG to plugin repository"
+          git push
