@@ -1,0 +1,105 @@
+name: Bug report
+description: Something isn't working, or your Discord status shows the wrong thing.
+labels: [bug]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Thanks for reporting this. Please don't paste your `config.json` or anything else that contains your access token, and leave out your server's address if it's public.
+
+  - type: dropdown
+    id: part
+    attributes:
+      label: Which part has the problem?
+      options:
+        - The jf-dp app on my Mac
+        - The Discord Rich Presence plugin on my Jellyfin server
+        - I'm not sure
+    validations:
+      required: true
+
+  - type: textarea
+    id: what-happened
+    attributes:
+      label: What happened?
+      description: What you saw, and what you expected to see instead.
+      placeholder: I started an episode, but my Discord status still showed nothing.
+    validations:
+      required: true
+
+  - type: textarea
+    id: steps
+    attributes:
+      label: How can we make it happen?
+      description: The steps that lead to the problem, if you know them.
+      placeholder: |
+        1. Play an episode in the Jellyfin web app
+        2. Pause it
+        3. ...
+
+  - type: textarea
+    id: menu
+    attributes:
+      label: What does the jf-dp menu say?
+      description: Click the TV icon in your menu bar and copy the lines at the top, like "Nothing playing" or "Can't reach Jellyfin. Retrying…".
+
+  - type: dropdown
+    id: media
+    attributes:
+      label: What were you playing?
+      multiple: true
+      options:
+        - A movie
+        - A TV episode
+        - Music
+        - Something else
+        - Nothing
+
+  - type: input
+    id: app-version
+    attributes:
+      label: jf-dp app version
+      description: Click the TV icon in your menu bar, then **About jf-dp**.
+      placeholder: "1.2.0"
+
+  - type: input
+    id: plugin-version
+    attributes:
+      label: Plugin version
+      description: In Jellyfin, **Dashboard → Plugins → My Plugins**. Ask whoever runs your server if you can't see the Dashboard.
+      placeholder: "1.2.0.0"
+
+  - type: input
+    id: jellyfin-version
+    attributes:
+      label: Jellyfin version
+      description: Shown on the Jellyfin **Dashboard**.
+      placeholder: "12.0.0"
+
+  - type: input
+    id: macos-version
+    attributes:
+      label: macOS version
+      description: Apple menu → **About This Mac**.
+      placeholder: "macOS 26.1"
+
+  - type: checkboxes
+    id: discord
+    attributes:
+      label: Discord
+      options:
+        - label: The Discord desktop app was open on the same Mac (the website doesn't work with jf-dp).
+
+  - type: textarea
+    id: extra
+    attributes:
+      label: Anything else?
+      description: Screenshots of your Discord status or the jf-dp menu help a lot. You can drag images into this box.
+
+  - type: checkboxes
+    id: searched
+    attributes:
+      label: Before you send this
+      options:
+        - label: I've checked the [open issues](https://github.com/sypion/jf-dp/issues) for the same problem.
+          required: true

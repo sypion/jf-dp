@@ -1,0 +1,35 @@
+name: Feature request
+description: Suggest something jf-dp could do.
+labels: [enhancement]
+body:
+  - type: textarea
+    id: problem
+    attributes:
+      label: What would you like to do?
+      description: The thing you'd like to do, or what bothers you about how jf-dp works today.
+      placeholder: I'd like my Discord status to show which season I'm on, not just the episode.
+    validations:
+      required: true
+
+  - type: textarea
+    id: idea
+    attributes:
+      label: How do you imagine it working?
+      description: Optional. A sketch or screenshot of what you have in mind is welcome.
+
+  - type: dropdown
+    id: part
+    attributes:
+      label: Which part would it change?
+      options:
+        - The jf-dp app on my Mac
+        - The Discord Rich Presence plugin on my Jellyfin server
+        - I'm not sure
+
+  - type: checkboxes
+    id: searched
+    attributes:
+      label: Before you send this
+      options:
+        - label: I've checked the [open issues](https://github.com/sypion/jf-dp/issues) for the same idea.
+          required: true

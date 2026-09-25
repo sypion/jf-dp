@@ -1,0 +1,8 @@
+blank_issues_enabled: false
+contact_links:
+  - name: Help setting up jf-dp
+    url: https://github.com/sypion/jf-dp#readme
+    about: Installing the plugin and the app is covered step by step in the README.
+  - name: Report a security problem
+    url: https://github.com/sypion/jf-dp/security/advisories/new
+    about: Please report security problems privately here rather than in a public issue.
