@@ -63,7 +63,6 @@ jobs:
             version="$SEMVER.$(dotnet msbuild "$PROJECT" -p:TargetFramework="$framework" -getProperty:PluginRevision)"
             dotnet publish "$PROJECT" -f "$framework" -c Release -o "out/$framework" -warnaserror \
               -p:Version="$SEMVER" -p:AssemblyVersion="$version" -p:FileVersion="$version"
-            # Jellyfin unzips this into its plugins folder and writes meta.json itself from manifest.json.
             zip -j "dist/jf-dp_$version.zip" "out/$framework/Jellyfin.Plugin.DiscordPresence.dll"
           done
 

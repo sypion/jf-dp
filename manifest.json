@@ -1,0 +1,20 @@
+[
+  {
+    "guid": "bef32adf-0271-405b-97eb-aa01d658ef21",
+    "name": "Discord Rich Presence",
+    "overview": "Show what you're playing on Jellyfin in your Discord status",
+    "description": "Publishes each user's playback to a companion app running next to their Discord desktop client, which shows it as a \"Watching\" / \"Listening\" activity with artwork, a progress bar and links.",
+    "owner": "sypion",
+    "category": "General",
+    "versions": [
+      {
+        "version": "1.0.0.0",
+        "changelog": "",
+        "targetAbi": "12.0.0.0",
+        "sourceUrl": "",
+        "checksum": "",
+        "timestamp": ""
+      }
+    ]
+  }
+]
