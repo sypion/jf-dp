@@ -70,7 +70,7 @@ To change the icon, edit `scripts/make-icon.swift` and run `swift scripts/make-i
 
 ### The macOS app's updates
 
-Each release carries the app three ways:
+Each macOS release carries the app three ways:
 
 - `jf-dp_macos.dmg`, for new installs
 - `jf-dp_macos.zip` and `appcast.xml`, for [Sparkle](https://sparkle-project.org) updates

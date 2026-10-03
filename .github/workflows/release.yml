@@ -1,8 +1,7 @@
 name: Release
 
-# Push a tag like v1.2.0: builds everything into a draft GitHub release with generated notes.
-# Edit the notes there and publish it; publish.yml then ships it to Jellyfin servers and the macOS app.
-# A tag like macos-v1.2.0 releases only the macOS app and leaves the plugin on servers alone.
+# Push a tag like v1.2.0 to release the plugin, or macos-v1.2.0 to release the macOS app. Each builds
+# only its own part into a draft GitHub release with generated notes.
 on:
   push:
     tags: ["v*.*.*", "macos-v*.*.*"]
@@ -23,22 +22,13 @@ jobs:
     steps:
       - id: parse
         env:
-          GH_TOKEN: ${{ github.token }}
-          GH_REPO: ${{ github.repository }}
           TAG: ${{ github.ref_name }}
         run: |
           if [[ ! "$TAG" =~ ^(macos-)?v([0-9]+\.[0-9]+\.[0-9]+)$ ]]; then
-            echo "::error::Tag '$TAG' must look like v1.2.3, or macos-v1.2.3 for the macOS app alone"
+            echo "::error::Tag '$TAG' must look like v1.2.3 for the plugin, or macos-v1.2.3 for the macOS app"
             exit 1
           fi
-          semver="${BASH_REMATCH[2]}"
-
-          if [ -n "${BASH_REMATCH[1]}" ]; then other="v$semver"; else other="macos-v$semver"; fi
-          if gh api "repos/$GH_REPO/git/ref/tags/$other" --silent 2>/dev/null; then
-            echo "::error::$other already exists; use the next version"
-            exit 1
-          fi
-          echo "semver=$semver" >> "$GITHUB_OUTPUT"
+          echo "semver=${BASH_REMATCH[2]}" >> "$GITHUB_OUTPUT"
           echo "plugin=$([ -z "${BASH_REMATCH[1]}" ] && echo true || echo false)" >> "$GITHUB_OUTPUT"
 
   plugin:
@@ -74,6 +64,7 @@ jobs:
 
   macos-app:
     needs: version
+    if: needs.version.outputs.plugin == 'false'
     runs-on: macos-latest
     permissions:
       # Writing release notes for the update window counts as a write.

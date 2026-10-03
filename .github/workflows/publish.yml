@@ -26,7 +26,7 @@ jobs:
       - id: parse
         run: |
           if [[ ! "$TAG" =~ ^(macos-)?v([0-9]+\.[0-9]+\.[0-9]+)$ ]]; then
-            echo "::error::Tag '$TAG' must look like v1.2.3, or macos-v1.2.3 for the macOS app alone"
+            echo "::error::Tag '$TAG' must look like v1.2.3 for the plugin, or macos-v1.2.3 for the macOS app"
             exit 1
           fi
           echo "semver=${BASH_REMATCH[2]}" >> "$GITHUB_OUTPUT"
@@ -41,14 +41,12 @@ jobs:
         env:
           PLUGIN: ${{ steps.parse.outputs.plugin }}
         run: |
-          patterns=(--pattern appcast.xml)
-          if [ "$PLUGIN" = "true" ]; then
-            patterns+=(--pattern 'jf-dp_[0-9]*.zip')
-          fi
-          gh release download "$TAG" --dir "$RUNNER_TEMP/dist" "${patterns[@]}"
+          if [ "$PLUGIN" = "true" ]; then pattern='jf-dp_[0-9]*.zip'; else pattern=appcast.xml; fi
+          gh release download "$TAG" --dir "$RUNNER_TEMP/dist" --pattern "$pattern"
           printf '%s\n' "$NOTES" > "$RUNNER_TEMP/notes.md"
 
       - name: Update appcast.xml
+        if: steps.parse.outputs.plugin == 'false'
         run: |
           python3 .github/scripts/update_appcast.py "$RUNNER_TEMP/dist/appcast.xml" --notes-file "$RUNNER_TEMP/notes.md"
           gh release upload "$TAG" "$RUNNER_TEMP/dist/appcast.xml" --clobber
@@ -74,3 +72,12 @@ jobs:
           git add manifest.json
           git commit -m "Publish $TAG to plugin repository"
           git push
+
+      - name: Keep the macOS release as latest
+        if: steps.parse.outputs.plugin == 'true'
+        run: |
+          macos=$(gh release list --exclude-drafts --exclude-pre-releases --json tagName \
+            --jq '[.[] | select(.tagName | startswith("macos-v"))][0].tagName // empty')
+          if [ -n "$macos" ]; then
+            gh release edit "$macos" --latest
+          fi
