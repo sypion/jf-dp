@@ -4,7 +4,7 @@ name: Publish
 # GitHub release notes are what Jellyfin's plugin catalog and the macOS app's update window show.
 on:
   release:
-    types: [published, released, edited]
+    types: [released, edited]
 
 permissions:
   contents: write
@@ -15,8 +15,10 @@ concurrency:
 
 jobs:
   publish:
-    # Sparkle's feed skips pre-releases, so Jellyfin servers do too.
-    if: ${{ !github.event.release.draft && !github.event.release.prerelease }}
+    # Sparkle's feed skips pre-releases, so Jellyfin servers do too. Edits only matter when the notes changed.
+    if: >-
+      ${{ !github.event.release.draft && !github.event.release.prerelease
+      && (github.event.action != 'edited' || github.event.changes.body) }}
     runs-on: ubuntu-latest
     env:
       GH_TOKEN: ${{ github.token }}
