@@ -8,6 +8,22 @@
     "category": "General",
     "versions": [
       {
+        "version": "1.0.1.1",
+        "changelog": "Initial release.",
+        "targetAbi": "12.0.0.0",
+        "sourceUrl": "https://github.com/sypion/jf-dp/releases/download/v1.0.1/jf-dp_1.0.1.1.zip",
+        "checksum": "ffdfd829dca8b4d29d88fe3b68f488da",
+        "timestamp": "2026-10-03T00:16:30Z"
+      },
+      {
+        "version": "1.0.1.0",
+        "changelog": "Initial release.",
+        "targetAbi": "10.11.0.0",
+        "sourceUrl": "https://github.com/sypion/jf-dp/releases/download/v1.0.1/jf-dp_1.0.1.0.zip",
+        "checksum": "677ef96fd793fab365747812bdb7412b",
+        "timestamp": "2026-10-03T00:16:30Z"
+      },
+      {
         "version": "1.0.0.0",
         "changelog": "",
         "targetAbi": "12.0.0.0",
